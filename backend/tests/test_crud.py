@@ -33,6 +33,35 @@ def test_create_and_list_beneficiary(client, db_session):
     assert event.entity_label == "Beneficiario Prueba S.A.S."
 
 
+def test_action_and_audit_are_atomic_when_commit_fails(client, db_session, monkeypatch):
+    import pytest
+    from sqlalchemy.orm import Session
+
+    from app.models.audit_log import AuditLog
+    from app.models.beneficiary import Beneficiary
+    from app.models.company import CompanyDemo
+
+    db_session.add(CompanyDemo(id="co_atomicity", name="Empresa", currency_base="USD"))
+    db_session.commit()
+
+    def fail_commit(_session):
+        raise RuntimeError("simulated commit failure")
+
+    monkeypatch.setattr(Session, "commit", fail_commit)
+    with pytest.raises(RuntimeError, match="simulated commit failure"):
+        client.post(
+            "/api/v1/beneficiaries",
+            json={
+                "id": "ben_atomicity",
+                "company_id": "co_atomicity",
+                "name": "Proveedor",
+            },
+        )
+
+    assert db_session.query(Beneficiary).filter_by(id="ben_atomicity").count() == 0
+    assert db_session.query(AuditLog).filter_by(entity_id="ben_atomicity").count() == 0
+
+
 def test_create_beneficiary_normalizes_name_on_server(client):
     response = client.post(
         "/api/v1/beneficiaries",
@@ -317,6 +346,17 @@ def test_policy_audit_diff_activation_and_budget(client, db_session):
             **payload,
             "version": 2,
             "period_budget": "4500",
+            "rule_actions": [
+                {
+                    "code": action["code"],
+                    "action": (
+                        "BLOCKED"
+                        if action["code"] == "MISSING_REQUIRED_FIELDS"
+                        else action["action"]
+                    ),
+                }
+                for action in payload["rule_actions"]
+            ],
             "activate": False,
             "change_reason": "Aumento de presupuesto",
         },
@@ -327,6 +367,12 @@ def test_policy_audit_diff_activation_and_budget(client, db_session):
         action="POLICY_CREATED", entity_id=second_id
     ).one()
     assert second_event.changes["period_budget"] == {"before": "4000", "after": "4500"}
+    assert second_event.changes["rule_actions"] == {
+        "before": {**{item["code"]: item["action"] for item in payload["rule_actions"]},
+                   "MISSING_REQUIRED_FIELDS": "NEEDS_HUMAN_APPROVAL"},
+        "after": {**{item["code"]: item["action"] for item in payload["rule_actions"]},
+                  "MISSING_REQUIRED_FIELDS": "BLOCKED"},
+    }
     assert second_event.event_metadata["change_reason"] == "Aumento de presupuesto"
 
     activated = client.post("/api/v1/policy/activate", json={"policy_id": second_id})

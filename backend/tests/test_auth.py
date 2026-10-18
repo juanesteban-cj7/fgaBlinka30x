@@ -21,6 +21,8 @@ def test_auth_rejects_invalid_password(unauthenticated_client):
 
 
 def test_auth_required_for_data_modifications(unauthenticated_client):
+    from app.rules.catalog import RULE_CATALOG
+
     requests = [
         ("post", "/api/v1/beneficiaries", {
             "id": "ben_auth_test",
@@ -41,6 +43,22 @@ def test_auth_required_for_data_modifications(unauthenticated_client):
             "reason": "Revisión",
         }),
         ("post", "/api/v1/invoices/no-existe/evaluate", None),
+        ("put", "/api/v1/policy/", {
+            "company_id": "co_demo_001",
+            "version": 1,
+            "currency": "USD",
+            "max_invoice_amount": 5000,
+            "approval_threshold": 1000,
+            "period_budget": 12000,
+            "period_type": "monthly",
+            "period_basis": "issue_date",
+            "rule_actions": [
+                {"code": item["code"], "action": item["default_action"]}
+                for item in RULE_CATALOG
+            ],
+            "change_reason": "Prueba de autenticación",
+            "activate": True,
+        }),
         ("patch", "/api/v1/policy/budget", {"period_budget": 100}),
         ("post", "/api/v1/policy/activate", {"policy_id": "no-existe"}),
     ]
@@ -59,4 +77,7 @@ def test_auth_required_for_upload_and_reextraction(unauthenticated_client):
     assert response.status_code == 401, response.text
 
     response = unauthenticated_client.post("/api/v1/invoices/no-existe/extract")
+    assert response.status_code == 401, response.text
+
+    response = unauthenticated_client.get("/api/v1/audit-log")
     assert response.status_code == 401, response.text
