@@ -23,4 +23,6 @@ WORKDIR /app/backend
 
 EXPOSE 8000
 
+# Render define $PORT; en local se usa 8000. Antes de arrancar: migraciones y datos demo.
+
 CMD ["sh", "-c", "python -m app.services.migrate && python -m app.services.seed && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
