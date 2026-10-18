@@ -14,6 +14,7 @@ from app.models.human_review import HumanReview
 from app.models.beneficiary import Beneficiary
 from app.rules.normalization import norm_name
 from app.schemas.invoice import InvoiceOut, InvoiceCreate, InvoiceUpdate
+from app.services.audit import INVOICE_APPROVED, INVOICE_REJECTED, INVOICE_UPLOADED, record_audit
 from app.services.invoice_numbering import next_invoice_number
 
 router = APIRouter()
@@ -45,13 +46,32 @@ def list_invoices(
 def create_invoice(
     payload: InvoiceCreate,
     db: Session = Depends(get_db),
-    _user: AppUser = Depends(get_current_user),
+    user: AppUser = Depends(get_current_user),
 ):
     existing = db.query(Invoice).filter(Invoice.id == payload.id).first()
     if existing:
         raise HTTPException(status_code=400, detail="La factura ya existe")
     invoice = Invoice(**payload.model_dump())
     db.add(invoice)
+    label = invoice.invoice_number or invoice.id
+    record_audit(
+        db,
+        actor=user,
+        action=INVOICE_UPLOADED,
+        entity_type="invoice",
+        entity_id=invoice.id,
+        entity_label=label,
+        summary=f"{user.full_name} cargó la factura {label}",
+        metadata={
+            "file_name": invoice.file_name,
+            "file_hash": invoice.file_hash,
+            "beneficiary_id": invoice.beneficiary_id,
+            "amount": float(invoice.amount) if invoice.amount is not None else None,
+            "currency": invoice.currency,
+            "source_type": invoice.source_type,
+        },
+        company_id=invoice.company_id,
+    )
     db.commit()
     db.refresh(invoice)
     return invoice
@@ -178,5 +198,19 @@ def review_invoice(
     )
     invoice.status = "APPROVED" if payload.action == "approve" else "REJECTED"
     db.add(review)
+    approved = payload.action == "approve"
+    label = invoice.invoice_number or invoice.id
+    record_audit(
+        db,
+        actor=user,
+        action=INVOICE_APPROVED if approved else INVOICE_REJECTED,
+        entity_type="invoice",
+        entity_id=invoice.id,
+        entity_label=label,
+        summary=f"{user.full_name} {'aprobó' if approved else 'rechazó'} la factura {label}",
+        changes={"status": {"before": "NEEDS_HUMAN_APPROVAL", "after": invoice.status}},
+        metadata={"reason": reason},
+        company_id=invoice.company_id,
+    )
     db.commit()
     return {"invoice_id": invoice.id, "status": invoice.status, "action": payload.action, "reason": reason}

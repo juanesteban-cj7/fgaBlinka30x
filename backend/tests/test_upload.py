@@ -88,6 +88,8 @@ def patch_extract(monkeypatch):
 
 
 def test_upload_pdf_creates_pending_invoice(client, db_session, patch_extract):
+    from app.models.audit_log import AuditLog
+
     _seed_company(db_session)
     pdf_bytes = _make_pdf_bytes()
 
@@ -101,6 +103,13 @@ def test_upload_pdf_creates_pending_invoice(client, db_session, patch_extract):
     assert body["file_name"] == "factura.pdf"
     assert body["file_hash"].startswith("sha256:")
     assert body["ocr_available"] is False
+    event = db_session.query(AuditLog).filter_by(
+        action="INVOICE_UPLOADED", entity_id=body["id"]
+    ).one()
+    assert event.actor_id == "test_user_01"
+    assert event.event_metadata["file_name"] == "factura.pdf"
+    assert event.event_metadata["file_hash"] == body["file_hash"]
+    assert "raw_text" not in event.event_metadata
 
 
 def test_upload_rejected_extension(client, db_session):

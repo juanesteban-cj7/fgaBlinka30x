@@ -4,7 +4,7 @@ def test_list_empty_beneficiaries(client):
     assert response.json() == []
 
 
-def test_create_and_list_beneficiary(client):
+def test_create_and_list_beneficiary(client, db_session):
     payload = {
         "id": "ben_test_01",
         "company_id": "co_demo_001",
@@ -23,6 +23,14 @@ def test_create_and_list_beneficiary(client):
     response = client.get("/api/v1/beneficiaries?company_id=co_demo_001")
     assert response.status_code == 200
     assert len(response.json()) == 1
+    from app.models.audit_log import AuditLog
+
+    event = db_session.query(AuditLog).filter_by(
+        action="BENEFICIARY_CREATED", entity_id="ben_test_01"
+    ).one()
+    assert event.actor_id == "test_user_01"
+    assert event.actor_name == "Usuario de prueba"
+    assert event.entity_label == "Beneficiario Prueba S.A.S."
 
 
 def test_create_beneficiary_normalizes_name_on_server(client):
@@ -70,6 +78,16 @@ def test_update_beneficiary_updates_name_and_normalized_name(client, db_session)
     assert response.json()["name"] == "Proveedor Pacífico S.A.S."
     assert response.json()["normalized_name"] == "proveedor pacifico sas"
     assert response.json()["category"] == "Servicios"
+    from app.models.audit_log import AuditLog
+
+    event = db_session.query(AuditLog).filter_by(
+        action="BENEFICIARY_UPDATED", entity_id="ben_update_01"
+    ).one()
+    assert event.changes["name"] == {
+        "before": "Proveedor Original",
+        "after": "Proveedor Pacífico S.A.S.",
+    }
+    assert event.actor_id == "test_user_01"
 
 
 def test_update_missing_beneficiary_returns_not_found(client, db_session):
@@ -79,6 +97,26 @@ def test_update_missing_beneficiary_returns_not_found(client, db_session):
     )
 
     assert response.status_code == 404
+
+
+def test_beneficiary_patch_without_changes_does_not_add_audit_event(client, db_session):
+    from app.models.audit_log import AuditLog
+    from app.models.beneficiary import Beneficiary
+    from app.models.company import CompanyDemo
+
+    db_session.add(CompanyDemo(id="co_patch_noop", name="Empresa", currency_base="USD"))
+    db_session.add(Beneficiary(
+        id="ben_patch_noop", company_id="co_patch_noop", name="Proveedor",
+        normalized_name="proveedor", allowed=True,
+    ))
+    db_session.commit()
+
+    response = client.patch("/api/v1/beneficiaries/ben_patch_noop", json={"name": "Proveedor"})
+
+    assert response.status_code == 200, response.text
+    assert db_session.query(AuditLog).filter_by(
+        entity_id="ben_patch_noop", action="BENEFICIARY_UPDATED"
+    ).count() == 0
 
 
 def test_delete_unreferenced_beneficiary(client, db_session):
@@ -96,6 +134,13 @@ def test_delete_unreferenced_beneficiary(client, db_session):
 
     assert response.status_code == 204
     assert db_session.query(Beneficiary).filter_by(id="ben_delete").first() is None
+    from app.models.audit_log import AuditLog
+
+    event = db_session.query(AuditLog).filter_by(
+        action="BENEFICIARY_DELETED", entity_id="ben_delete"
+    ).one()
+    assert event.entity_label == "Proveedor"
+    assert event.event_metadata["snapshot"]["name"] == "Proveedor"
 
 
 def test_delete_beneficiary_with_invoice_returns_conflict(client, db_session):
@@ -228,7 +273,79 @@ def test_policy_contract_rejects_blank_change_reason(client):
     assert any("change_reason" in ".".join(map(str, issue["loc"])) for issue in response.json()["detail"])
 
 
-def test_create_and_list_invoice(client):
+def test_policy_audit_diff_activation_and_budget(client, db_session):
+    from app.models.audit_log import AuditLog
+    from app.models.company import CompanyDemo
+    from app.rules.catalog import RULE_CATALOG
+
+    db_session.add(CompanyDemo(id="co_audit_policy", name="Empresa", currency_base="USD"))
+    db_session.commit()
+    payload = {
+        "company_id": "co_audit_policy",
+        "version": 1,
+        "currency": "USD",
+        "max_invoice_amount": "5000",
+        "approval_threshold": "1000",
+        "period_budget": "4000",
+        "period_type": "monthly",
+        "period_basis": "issue_date",
+        "amount_tolerance_pct": "0",
+        "min_extraction_confidence": 0.8,
+        "name_similarity_threshold": 0.85,
+        "possible_duplicate_date_window_days": 0,
+        "rule_actions": [
+            {"code": item["code"], "action": item["default_action"]}
+            for item in RULE_CATALOG
+        ],
+        "change_reason": "Versión inicial de prueba",
+        "activate": True,
+    }
+
+    first = client.put("/api/v1/policy/", json=payload)
+    assert first.status_code == 200, first.text
+    first_id = first.json()["id"]
+    first_events = db_session.query(AuditLog).filter_by(entity_id=first_id).all()
+    assert [event.action for event in first_events].count("POLICY_CREATED") == 1
+    assert [event.action for event in first_events].count("POLICY_ACTIVATED") == 1
+    created_event = next(event for event in first_events if event.action == "POLICY_CREATED")
+    assert created_event.actor_id == "test_user_01"
+    assert created_event.event_metadata["change_reason"] == "Versión inicial de prueba"
+
+    second = client.put(
+        "/api/v1/policy/",
+        json={
+            **payload,
+            "version": 2,
+            "period_budget": "4500",
+            "activate": False,
+            "change_reason": "Aumento de presupuesto",
+        },
+    )
+    assert second.status_code == 200, second.text
+    second_id = second.json()["id"]
+    second_event = db_session.query(AuditLog).filter_by(
+        action="POLICY_CREATED", entity_id=second_id
+    ).one()
+    assert second_event.changes["period_budget"] == {"before": "4000", "after": "4500"}
+    assert second_event.event_metadata["change_reason"] == "Aumento de presupuesto"
+
+    activated = client.post("/api/v1/policy/activate", json={"policy_id": second_id})
+    assert activated.status_code == 200, activated.text
+    activation = db_session.query(AuditLog).filter_by(
+        action="POLICY_ACTIVATED", entity_id=second_id
+    ).one()
+    assert activation.event_metadata["deactivated_policy_version"] == 1
+    assert activation.actor_id == "test_user_01"
+
+    budget = client.patch("/api/v1/policy/budget", json={"period_budget": 5000})
+    assert budget.status_code == 200, budget.text
+    budget_event = db_session.query(AuditLog).filter_by(
+        action="POLICY_BUDGET_UPDATED", entity_id=second_id
+    ).one()
+    assert budget_event.changes["period_budget"] == {"before": 4500.0, "after": 5000.0}
+
+
+def test_create_and_list_invoice(client, db_session):
     payload = {
         "id": "inv_test_01",
         "company_id": "co_demo_001",
@@ -250,6 +367,13 @@ def test_create_and_list_invoice(client):
     data = response.json()
     assert data["id"] == "inv_test_01"
     assert data["status"] == "PENDING"
+    from app.models.audit_log import AuditLog
+
+    upload_event = db_session.query(AuditLog).filter_by(
+        action="INVOICE_UPLOADED", entity_id="inv_test_01"
+    ).one()
+    assert upload_event.actor_id == "test_user_01"
+    assert upload_event.event_metadata["amount"] == 800.0
 
     response = client.get("/api/v1/invoices/inv_test_01")
     assert response.status_code == 200
@@ -262,6 +386,46 @@ def test_create_and_list_invoice(client):
     response = client.get("/api/v1/invoices?beneficiary_id=ben_test_01")
     assert response.status_code == 200
     assert len(response.json()) == 1
+
+
+def test_invoice_review_audit_uses_authenticated_actor(client, db_session):
+    from app.models.audit_log import AuditLog
+    from app.models.company import CompanyDemo
+    from app.models.human_review import HumanReview
+    from app.models.invoice import Invoice
+
+    db_session.add(CompanyDemo(id="co_review_audit", name="Empresa", currency_base="USD"))
+    db_session.add(
+        Invoice(
+            id="inv_review_audit",
+            company_id="co_review_audit",
+            source_type="manual",
+            status="NEEDS_HUMAN_APPROVAL",
+            invoice_number="FAC-REVIEW",
+        )
+    )
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/invoices/inv_review_audit/review",
+        json={
+            "action": "approve",
+            "reason": "Verificación completada",
+            "reviewer_demo_id": "usuario_falsificado",
+        },
+    )
+    assert response.status_code == 200, response.text
+    review = db_session.query(HumanReview).filter_by(invoice_id="inv_review_audit").one()
+    assert review.reviewer_demo_id == "test_user_01"
+    event = db_session.query(AuditLog).filter_by(
+        action="INVOICE_APPROVED", entity_id="inv_review_audit"
+    ).one()
+    assert event.actor_id == "test_user_01"
+    assert event.event_metadata["reason"] == "Verificación completada"
+    assert event.changes["status"] == {
+        "before": "NEEDS_HUMAN_APPROVAL",
+        "after": "APPROVED",
+    }
 
 
 def test_patch_invoice_corrections_sync_extracted_fields_and_reset_status(client, db_session):

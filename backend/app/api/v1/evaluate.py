@@ -16,12 +16,12 @@ router = APIRouter()
 def evaluate_invoice(
     invoice_id: str,
     db: Session = Depends(get_db),
-    _user: AppUser = Depends(get_current_user),
+    user: AppUser = Depends(get_current_user),
 ):
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Factura no encontrada")
-    return evaluate_and_record(db, invoice_id)
+    return evaluate_and_record(db, invoice_id, actor=user)
 
 
 @router.get("/{invoice_id}/decisions", tags=["invoices"])

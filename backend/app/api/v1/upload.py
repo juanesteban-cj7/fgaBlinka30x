@@ -21,6 +21,7 @@ from app.models.invoice import Invoice
 from app.rules.normalization import norm_name
 from app.schemas.invoice import InvoiceUploadOut
 from app.services.extraction import ExtractionResult, extract_file
+from app.services.audit import INVOICE_UPLOADED, record_audit
 
 router = APIRouter()
 
@@ -103,7 +104,7 @@ async def upload_invoice(
     due_date: date | None = Form(None),
     description: str | None = Form(None),
     db: Session = Depends(get_db),
-    _user: AppUser = Depends(get_current_user),
+    user: AppUser = Depends(get_current_user),
 ):
     resolved_company_id: str
     beneficiary = None
@@ -176,6 +177,25 @@ async def upload_invoice(
         },
     )
     db.add(invoice)
+    label = invoice.invoice_number or invoice.id
+    record_audit(
+        db,
+        actor=user,
+        action=INVOICE_UPLOADED,
+        entity_type="invoice",
+        entity_id=invoice.id,
+        entity_label=label,
+        summary=f"{user.full_name} cargó la factura {label}",
+        metadata={
+            "file_name": invoice.file_name,
+            "file_hash": invoice.file_hash,
+            "beneficiary_id": invoice.beneficiary_id,
+            "amount": invoice.amount,
+            "currency": invoice.currency,
+            "source_type": invoice.source_type,
+        },
+        company_id=invoice.company_id,
+    )
     db.commit()
     db.refresh(invoice)
 

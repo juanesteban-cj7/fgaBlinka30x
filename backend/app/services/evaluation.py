@@ -11,7 +11,9 @@ from app.models.policy import PaymentPolicy
 from app.models.rule_action import RuleAction
 from app.models.beneficiary import Beneficiary
 from app.models.agreement import Agreement
+from app.models.app_user import AppUser
 from app.rules.engine import evaluate
+from app.services.audit import INVOICE_EVALUATED, record_audit
 
 
 def _reservations_by_period(db: Session, company_id: str):
@@ -24,7 +26,7 @@ def _reservations_by_period(db: Session, company_id: str):
     return {period: Decimal(str(total or 0)) for period, total in rows}
 
 
-def evaluate_and_record(db: Session, invoice_id: str):
+def evaluate_and_record(db: Session, invoice_id: str, actor: AppUser | None = None):
     invoice = (
         db.query(Invoice)
         .options(joinedload(Invoice.company))
@@ -92,6 +94,24 @@ def evaluate_and_record(db: Session, invoice_id: str):
                     status="reserved",
                 )
             )
+
+    if actor:
+        label = invoice.invoice_number or invoice.id
+        record_audit(
+            db,
+            actor=actor,
+            action=INVOICE_EVALUATED,
+            entity_type="invoice",
+            entity_id=invoice.id,
+            entity_label=label,
+            summary=f"{actor.full_name} evaluó la factura {label}: {result.outcome}",
+            metadata={
+                "outcome": result.outcome,
+                "policy_version": result.policy_version or policy.version,
+                "reason_codes": result.reason_codes,
+            },
+            company_id=invoice.company_id,
+        )
 
     db.commit()
     db.refresh(invoice)

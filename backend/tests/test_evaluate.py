@@ -51,6 +51,8 @@ def _seed_policy(db):
 
 
 def test_evaluate_eligible_reserves_budget(client, db_session):
+    from app.models.audit_log import AuditLog
+
     _seed_policy(db_session)
     db_session.add(Invoice(
         id="inv_eval_01", company_id="co_demo_001", beneficiary_id="ben_001",
@@ -71,6 +73,15 @@ def test_evaluate_eligible_reserves_budget(client, db_session):
     assert data["outcome"] == "ELIGIBLE_SIMULATED"
     assert data["reserved_budget"] is True
     assert data["reason_codes"] == ["ALL_CHECKS_PASSED"]
+    event = db_session.query(AuditLog).filter_by(
+        action="INVOICE_EVALUATED", entity_id="inv_eval_01"
+    ).one()
+    assert event.actor_id == "test_user_01"
+    assert event.event_metadata == {
+        "outcome": "ELIGIBLE_SIMULATED",
+        "policy_version": 1,
+        "reason_codes": ["ALL_CHECKS_PASSED"],
+    }
 
     r2 = client.get("/api/v1/invoices/inv_eval_01/decisions")
     assert r2.status_code == 200
