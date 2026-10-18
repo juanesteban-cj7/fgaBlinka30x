@@ -10,6 +10,7 @@ Datos 100% ficticios. No ejecuta pagos reales.
 ## Estado actual — Fase 5 completada
 
 Aplicación web completa con backend (FastAPI + SQLAlchemy + Alembic + PostgreSQL) y frontend (React + TypeScript + Vite).
+- **Acceso autenticado:** inicio de sesión con JWT y tres usuarios ficticios de demostración.
 - **Fase 2:** CRUD de políticas, beneficiarios y facturas.
 - **Fase 3:** motor determinista de reglas (R1–R7), endpoint `/evaluate`, registro de decisiones (`decision_record`) y control de presupuesto (`budget_reservation`).
 - **Fase 4:** ingesta de documentos — `POST /invoices/upload` (PDF/imagen → texto con pypdf u OCR) y `POST /invoices/{id}/extract`.
@@ -98,6 +99,8 @@ fgaBlinka30x/
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
 | GET | `/health` | Estado del servicio |
+| POST | `/api/v1/auth/login` | Iniciar sesión y obtener un token JWT |
+| GET | `/api/v1/auth/me` | Consultar el usuario autenticado |
 | GET | `/api/v1/policy` | Política activa |
 | PUT | `/api/v1/policy` | Crear nueva versión de política |
 | POST | `/api/v1/policy/activate` | Activar una versión de política |
@@ -118,11 +121,27 @@ Documentación interactiva automática del backend: `http://localhost:8000/docs`
 
 ### Opción A: Backend + PostgreSQL con Docker Compose
 
+Define un secreto aleatorio de al menos 32 caracteres en `.env` antes de iniciar:
+
+```env
+JWT_SECRET=una-clave-aleatoria-de-al-menos-32-caracteres
+```
+
 ```bash
 docker compose up -d --build
 ```
 
 Levanta PostgreSQL y el backend, y carga los datos ficticios iniciales si aún no existen. La documentación queda en `http://localhost:8000/docs`.
+
+Usuarios de demostración (los tres usan la contraseña `Demo2026!`):
+
+| Usuario | Nombre |
+|---------|--------|
+| `ana.perez` | Ana Pérez |
+| `carlos.ruiz` | Carlos Ruiz |
+| `laura.gomez` | Laura Gómez |
+
+Los cambios de datos requieren autenticación. El actor se determina a partir del token, nunca de un identificador enviado en el cuerpo de la petición.
 
 ### Opción B: Backend sin Docker
 
@@ -131,6 +150,7 @@ cd backend
 pip install -r requirements.txt
 # Iniciar PostgreSQL desde otra terminal: docker compose up -d postgres
 # Configurar DATABASE_URL si no se usan los valores locales por defecto.
+# Configurar JWT_SECRET con una clave aleatoria de al menos 32 caracteres.
 alembic -c ../alembic.ini upgrade head
 python -m app.services.seed
 uvicorn app.main:app --reload

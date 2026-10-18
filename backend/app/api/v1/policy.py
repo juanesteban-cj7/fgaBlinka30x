@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_current_user
 from app.database import get_db
+from app.models.app_user import AppUser
 from app.models.policy import PaymentPolicy
 from app.models.rule_action import RuleAction
 from app.models.company import CompanyDemo
@@ -31,7 +33,11 @@ def get_active_policy(db: Session = Depends(get_db)):
 
 
 @router.put("/", response_model=PaymentPolicyOut, tags=["policy"])
-def create_policy(payload: PolicyCreate, db: Session = Depends(get_db)):
+def create_policy(
+    payload: PolicyCreate,
+    db: Session = Depends(get_db),
+    _user: AppUser = Depends(get_current_user),
+):
     company = db.query(CompanyDemo).filter(CompanyDemo.id == payload.company_id).first()
     if not company:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
@@ -84,7 +90,11 @@ def create_policy(payload: PolicyCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/activate", tags=["policy"])
-def activate_policy(payload: PolicyActivate, db: Session = Depends(get_db)):
+def activate_policy(
+    payload: PolicyActivate,
+    db: Session = Depends(get_db),
+    _user: AppUser = Depends(get_current_user),
+):
     policy = db.query(PaymentPolicy).filter(PaymentPolicy.id == payload.policy_id).first()
     if not policy:
         raise HTTPException(status_code=404, detail="Política no encontrada")
@@ -97,7 +107,11 @@ def activate_policy(payload: PolicyActivate, db: Session = Depends(get_db)):
 
 
 @router.patch("/budget", response_model=PaymentPolicyOut, tags=["policy"])
-def update_active_budget(payload: BudgetUpdate, db: Session = Depends(get_db)):
+def update_active_budget(
+    payload: BudgetUpdate,
+    db: Session = Depends(get_db),
+    _user: AppUser = Depends(get_current_user),
+):
     if payload.period_budget < 0:
         raise HTTPException(status_code=422, detail="El presupuesto no puede ser negativo")
 

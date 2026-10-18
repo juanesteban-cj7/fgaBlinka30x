@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { LayoutDashboard, FileText, Upload, ShieldCheck, Users, History, RotateCcw, Moon, Sun, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { useAuth } from './AuthContext'
 
 const links = [
   { path: '/', label: 'Panel', icon: LayoutDashboard },
@@ -17,6 +18,7 @@ export default function Layout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebar-collapsed') === 'true')
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark')
   const navigate = useNavigate()
+  const { user, logout } = useAuth()
 
   useEffect(() => {
     const theme = darkMode ? 'dark' : 'light'
@@ -73,6 +75,17 @@ export default function Layout() {
         <header className="app-navbar">
           <h1>{currentLabel()}</h1>
           <div className="header-actions">
+            <span className="header-user-name">{user?.full_name}</span>
+            <button
+              className="btn btn-outline header-logout"
+              type="button"
+              onClick={() => {
+                logout()
+                navigate('/login', { replace: true })
+              }}
+            >
+              Salir
+            </button>
             <button className="btn btn-icon btn-outline" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Menú" />
             <button
               className="btn btn-icon btn-outline theme-toggle"
@@ -85,7 +98,7 @@ export default function Layout() {
             </button>
           </div>
         </header>
-        <main>{<Outlet />}</main>
+        <main><Outlet /></main>
       </div>
     </div>
   )

@@ -6,8 +6,7 @@ import PolicyParams from '../components/rules/PolicyParams'
 import PolicyActionsMatrix from '../components/rules/PolicyActionsMatrix'
 import PolicyEditor from '../components/rules/PolicyEditor'
 import PolicyVersionsTable from '../components/rules/PolicyVersionsTable'
-
-const TEST_USER_STORAGE_KEY = 'rules-test-user'
+import { useAuth } from '../components/AuthContext'
 
 function draftFromPolicy(source: PaymentPolicy, version: number, catalog: RuleCatalogItem[]): PolicyDraft {
   const configuredActions = new Map(source.rule_actions.map(({ code, action }) => [code, action]))
@@ -42,12 +41,12 @@ export default function Rules() {
   const [versions, setVersions] = useState<PaymentPolicy[]>([])
   const [draftSource, setDraftSource] = useState<PaymentPolicy | null>(null)
   const [draft, setDraft] = useState<PolicyDraft | null>(null)
-  const [testUser, setTestUser] = useState(() => localStorage.getItem(TEST_USER_STORAGE_KEY) ?? '')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const canEdit = testUser.length > 0
+  const { user } = useAuth()
+  const canEdit = user !== null
 
   const refresh = useCallback(async () => {
     const [activePolicy, ruleCatalog, policyVersions] = await Promise.all([
@@ -65,12 +64,6 @@ export default function Rules() {
       .catch((err: unknown) => setError(errorMessage(err)))
       .finally(() => setLoading(false))
   }, [refresh])
-
-  const selectTestUser = (value: string) => {
-    setTestUser(value)
-    if (value) localStorage.setItem(TEST_USER_STORAGE_KEY, value)
-    else localStorage.removeItem(TEST_USER_STORAGE_KEY)
-  }
 
   const startDraft = (source: PaymentPolicy) => {
     const nextVersion = Math.max(0, ...versions.map(({ version }) => version)) + 1
@@ -137,18 +130,6 @@ export default function Rules() {
           </button>
         )}
       </div>
-
-      <section className="card rules-section rules-test-user">
-        <div className="form-group">
-          <label htmlFor="rules-test-user">Usuario de prueba</label>
-          <select id="rules-test-user" className="form-control" value={testUser} onChange={(event) => selectTestUser(event.target.value)}>
-            <option value="">Sin usuario seleccionado (solo lectura)</option>
-            <option value="demo_user">Usuario de prueba · demo_user</option>
-          </select>
-          <span className="field-hint">Selección local de demostración; no representa autenticación real.</span>
-        </div>
-        <p className="policy-version-state" role="status">{canEdit ? 'Edición habilitada para demo_user' : 'Modo lectura: no hay usuario de prueba seleccionado'}</p>
-      </section>
 
       {notice && <div className="alert alert-success" role="status" aria-live="polite">{notice}</div>}
       {error && !draft && <div className="alert alert-error" role="alert" aria-live="assertive">{error}</div>}

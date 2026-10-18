@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_current_user
 from app.database import get_db
+from app.models.app_user import AppUser
 from app.models.beneficiary import Beneficiary
 from app.rules.normalization import norm_name
 from app.schemas.beneficiary import BeneficiaryOut, BeneficiaryCreate, BeneficiaryUpdate
@@ -18,7 +20,11 @@ def list_beneficiaries(company_id: str | None = None, db: Session = Depends(get_
 
 
 @router.post("/", response_model=BeneficiaryOut, status_code=201, tags=["beneficiaries"])
-def create_beneficiary(payload: BeneficiaryCreate, db: Session = Depends(get_db)):
+def create_beneficiary(
+    payload: BeneficiaryCreate,
+    db: Session = Depends(get_db),
+    _user: AppUser = Depends(get_current_user),
+):
     existing = (
         db.query(Beneficiary)
         .filter(Beneficiary.id == payload.id)
@@ -27,6 +33,8 @@ def create_beneficiary(payload: BeneficiaryCreate, db: Session = Depends(get_db)
     if existing:
         raise HTTPException(status_code=400, detail="El beneficiario ya existe")
     beneficiary = Beneficiary(**payload.model_dump())
+    if not beneficiary.normalized_name:
+        beneficiary.normalized_name = norm_name(beneficiary.name)
     db.add(beneficiary)
     db.commit()
     db.refresh(beneficiary)
@@ -38,6 +46,7 @@ def update_beneficiary(
     beneficiary_id: str,
     payload: BeneficiaryUpdate,
     db: Session = Depends(get_db),
+    _user: AppUser = Depends(get_current_user),
 ):
     beneficiary = db.query(Beneficiary).filter(Beneficiary.id == beneficiary_id).first()
     if not beneficiary:

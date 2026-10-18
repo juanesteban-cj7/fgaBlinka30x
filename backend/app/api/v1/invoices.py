@@ -6,7 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_current_user
 from app.database import get_db
+from app.models.app_user import AppUser
 from app.models.invoice import Invoice
 from app.models.human_review import HumanReview
 from app.models.beneficiary import Beneficiary
@@ -20,7 +22,6 @@ router = APIRouter()
 class HumanReviewRequest(BaseModel):
     action: str = Field(pattern="^(approve|reject)$")
     reason: str = Field(min_length=1, max_length=2000)
-    reviewer_demo_id: str = Field(min_length=1, max_length=200)
 
 
 @router.get("/", response_model=list[InvoiceOut], tags=["invoices"])
@@ -41,7 +42,11 @@ def list_invoices(
 
 
 @router.post("/", response_model=InvoiceOut, status_code=201, tags=["invoices"])
-def create_invoice(payload: InvoiceCreate, db: Session = Depends(get_db)):
+def create_invoice(
+    payload: InvoiceCreate,
+    db: Session = Depends(get_db),
+    _user: AppUser = Depends(get_current_user),
+):
     existing = db.query(Invoice).filter(Invoice.id == payload.id).first()
     if existing:
         raise HTTPException(status_code=400, detail="La factura ya existe")
@@ -61,7 +66,12 @@ def get_invoice(invoice_id: str, db: Session = Depends(get_db)):
 
 
 @router.patch("/{invoice_id}", response_model=InvoiceOut, tags=["invoices"])
-def update_invoice(invoice_id: str, payload: InvoiceUpdate, db: Session = Depends(get_db)):
+def update_invoice(
+    invoice_id: str,
+    payload: InvoiceUpdate,
+    db: Session = Depends(get_db),
+    _user: AppUser = Depends(get_current_user),
+):
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Factura no encontrada")
@@ -144,7 +154,12 @@ def update_invoice(invoice_id: str, payload: InvoiceUpdate, db: Session = Depend
 
 
 @router.post("/{invoice_id}/review", tags=["invoices"])
-def review_invoice(invoice_id: str, payload: HumanReviewRequest, db: Session = Depends(get_db)):
+def review_invoice(
+    invoice_id: str,
+    payload: HumanReviewRequest,
+    db: Session = Depends(get_db),
+    user: AppUser = Depends(get_current_user),
+):
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Factura no encontrada")
@@ -157,7 +172,7 @@ def review_invoice(invoice_id: str, payload: HumanReviewRequest, db: Session = D
     review = HumanReview(
         id=f"review_{uuid.uuid4().hex[:12]}",
         invoice_id=invoice.id,
-        reviewer_demo_id=payload.reviewer_demo_id,
+        reviewer_demo_id=user.id,
         action=payload.action,
         reason=reason,
     )
