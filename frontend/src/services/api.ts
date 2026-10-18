@@ -1,4 +1,4 @@
-import { AppUser, Invoice, InvoiceCreate, InvoiceUpdate, Beneficiary, BeneficiaryCreate, BeneficiaryUpdate, LoginResponse, PaymentPolicy, DecisionRecord, DashboardSummary, InvoiceOutcome, BudgetUpdate, RuleCatalogItem, PolicyMutation, ApiValidationIssue } from '../types/index'
+import { AppUser, Invoice, InvoiceCreate, InvoiceUpdate, Beneficiary, BeneficiaryCreate, BeneficiaryUpdate, LoginResponse, PaymentPolicy, DecisionRecord, DashboardSummary, InvoiceOutcome, BudgetUpdate, RuleCatalogItem, PolicyMutation, ApiValidationIssue, AuditAction, AuditLogPage } from '../types/index'
 
 const API_BASE = '/api/v1'
 export const DEMO_COMPANY_ID = 'co_demo_001'
@@ -231,6 +231,25 @@ export const api = {
     decision_id: string
   }>(`/invoices/${id}/evaluate`, { method: 'POST' }),
   listDecisions: (id: string) => request<DecisionRecord[]>(`/invoices/${id}/decisions`),
+  listAuditLog: (params: {
+    action?: AuditAction
+    actor_id?: string
+    date_from?: string
+    date_to?: string
+    q?: string
+    limit?: number
+    offset?: number
+  } = {}) => {
+    const qs = new URLSearchParams()
+    if (params.action) qs.append('action', params.action)
+    if (params.actor_id) qs.set('actor_id', params.actor_id)
+    if (params.date_from) qs.set('date_from', params.date_from)
+    if (params.date_to) qs.set('date_to', params.date_to)
+    if (params.q) qs.set('q', params.q)
+    qs.set('limit', String(params.limit ?? 50))
+    qs.set('offset', String(params.offset ?? 0))
+    return request<AuditLogPage>(`/audit-log?${qs.toString()}`)
+  },
   reviewInvoice: (id: string, action: 'approve' | 'reject', reason: string) => request<{ invoice_id: string; status: InvoiceOutcome }>(`/invoices/${id}/review`, {
     method: 'POST',
     body: JSON.stringify({ action, reason }),

@@ -26,6 +26,7 @@ class InvoiceOut(InvoiceBase):
     company_id: str
     status: str
     created_at: datetime | None = None
+    last_policy_version: int | None = None
     extracted: Optional[Any] = None
 
     model_config = ConfigDict(from_attributes=True)

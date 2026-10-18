@@ -31,3 +31,15 @@ class Invoice(Base):
     decisions = relationship("DecisionRecord", back_populates="invoice", cascade="all, delete-orphan")
     human_reviews = relationship("HumanReview", back_populates="invoice", cascade="all, delete-orphan")
     budget_reservations = relationship("BudgetReservation", back_populates="invoice", cascade="all, delete-orphan")
+
+    @property
+    def last_policy_version(self) -> int | None:
+        latest = max(
+            self.decisions,
+            key=lambda decision: (
+                decision.created_at.isoformat() if decision.created_at else "",
+                decision.id,
+            ),
+            default=None,
+        )
+        return latest.policy_version if latest else None

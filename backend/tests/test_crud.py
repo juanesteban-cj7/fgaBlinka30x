@@ -378,14 +378,61 @@ def test_create_and_list_invoice(client, db_session):
     response = client.get("/api/v1/invoices/inv_test_01")
     assert response.status_code == 200
     assert response.json()["invoice_number"] == "T-001"
+    assert response.json()["last_policy_version"] is None
 
     response = client.get("/api/v1/invoices?status=PENDING&company_id=co_demo_001")
     assert response.status_code == 200
     assert len(response.json()) == 1
+    assert response.json()[0]["last_policy_version"] is None
 
     response = client.get("/api/v1/invoices?beneficiary_id=ben_test_01")
     assert response.status_code == 200
     assert len(response.json()) == 1
+
+
+def test_invoice_list_includes_latest_decision_policy_version(client, db_session):
+    from datetime import datetime
+
+    from app.models.company import CompanyDemo
+    from app.models.decision_record import DecisionRecord
+    from app.models.invoice import Invoice
+
+    db_session.add(CompanyDemo(id="co_last_version", name="Empresa", currency_base="USD"))
+    db_session.add(
+        Invoice(
+            id="inv_last_version",
+            company_id="co_last_version",
+            source_type="manual",
+            status="BLOCKED",
+        )
+    )
+    db_session.add_all(
+        [
+            DecisionRecord(
+                id="dec_last_v1",
+                invoice_id="inv_last_version",
+                policy_version=1,
+                outcome="BLOCKED",
+                reason_codes=[],
+                rules_evaluated=[],
+                created_at=datetime(2026, 1, 1),
+            ),
+            DecisionRecord(
+                id="dec_last_v3",
+                invoice_id="inv_last_version",
+                policy_version=3,
+                outcome="BLOCKED",
+                reason_codes=[],
+                rules_evaluated=[],
+                created_at=datetime(2026, 1, 2),
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get("/api/v1/invoices?company_id=co_last_version")
+    assert response.status_code == 200, response.text
+    assert response.json()[0]["last_policy_version"] == 3
 
 
 def test_invoice_review_audit_uses_authenticated_actor(client, db_session):

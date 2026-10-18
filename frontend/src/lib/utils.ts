@@ -1,3 +1,5 @@
+import { AuditAction } from '../types'
+
 export function cn(...classes: (string | boolean | undefined | null)[]): string {
   return classes.filter(Boolean).join(' ')
 }
@@ -44,6 +46,40 @@ export function outcomeClass(outcome: string): string {
     case 'HUMAN_APPROVED': return 'badge-eligible'
     case 'REJECTED': return 'badge-blocked'
     default: return 'badge-pending'
+  }
+}
+
+export function actionLabel(action: AuditAction): string {
+  switch (action) {
+    case 'POLICY_CREATED': return 'Política editada'
+    case 'POLICY_ACTIVATED': return 'Política activada'
+    case 'POLICY_BUDGET_UPDATED': return 'Presupuesto actualizado'
+    case 'BENEFICIARY_CREATED': return 'Beneficiario añadido'
+    case 'BENEFICIARY_UPDATED': return 'Beneficiario editado'
+    case 'BENEFICIARY_DELETED': return 'Beneficiario eliminado'
+    case 'INVOICE_UPLOADED': return 'Factura cargada'
+    case 'INVOICE_APPROVED': return 'Factura aprobada'
+    case 'INVOICE_REJECTED': return 'Factura rechazada'
+    case 'INVOICE_EVALUATED': return 'Factura evaluada'
+  }
+}
+
+export function actionClass(action: AuditAction): string {
+  switch (action) {
+    case 'POLICY_ACTIVATED':
+    case 'INVOICE_APPROVED':
+      return 'badge-eligible'
+    case 'BENEFICIARY_DELETED':
+    case 'INVOICE_REJECTED':
+      return 'badge-blocked'
+    case 'POLICY_BUDGET_UPDATED':
+    case 'INVOICE_UPLOADED':
+    case 'INVOICE_EVALUATED':
+      return 'badge-approval'
+    case 'POLICY_CREATED':
+    case 'BENEFICIARY_CREATED':
+    case 'BENEFICIARY_UPDATED':
+      return 'badge-pending'
   }
 }
 

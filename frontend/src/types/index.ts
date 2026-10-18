@@ -56,6 +56,7 @@ export interface Invoice {
   extracted: InvoiceExtractedFields | null
   status: InvoiceOutcome
   created_at: string | null
+  last_policy_version?: number | null
 }
 
 export interface InvoiceCreate {
@@ -194,6 +195,39 @@ export interface DecisionRecord {
   explanation: string | null
   rules_evaluated: string[]
   created_at: string | null
+}
+
+export type AuditAction =
+  | 'POLICY_CREATED'
+  | 'POLICY_ACTIVATED'
+  | 'POLICY_BUDGET_UPDATED'
+  | 'BENEFICIARY_CREATED'
+  | 'BENEFICIARY_UPDATED'
+  | 'BENEFICIARY_DELETED'
+  | 'INVOICE_UPLOADED'
+  | 'INVOICE_APPROVED'
+  | 'INVOICE_REJECTED'
+  | 'INVOICE_EVALUATED'
+
+export interface AuditLogEntry {
+  id: string
+  created_at: string
+  actor_type: 'user' | 'system'
+  actor_id: string | null
+  actor_name: string
+  action: AuditAction
+  entity_type: 'policy' | 'beneficiary' | 'invoice'
+  entity_id: string
+  entity_label: string
+  company_id: string | null
+  summary: string
+  changes: Record<string, { before: unknown; after: unknown }> | null
+  metadata: Record<string, unknown> | null
+}
+
+export interface AuditLogPage {
+  items: AuditLogEntry[]
+  total: number
 }
 
 export interface DashboardSummary {

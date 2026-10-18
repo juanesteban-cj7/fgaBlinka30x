@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_user
 from app.database import get_db
@@ -32,7 +32,7 @@ def list_invoices(
     beneficiary_id: str | None = None,
     db: Session = Depends(get_db),
 ):
-    query = db.query(Invoice)
+    query = db.query(Invoice).options(selectinload(Invoice.decisions))
     if company_id:
         query = query.filter(Invoice.company_id == company_id)
     if status:
