@@ -28,8 +28,8 @@ def test_create_and_list_beneficiary(client, db_session):
     event = db_session.query(AuditLog).filter_by(
         action="BENEFICIARY_CREATED", entity_id="ben_test_01"
     ).one()
-    assert event.actor_id == "test_user_01"
-    assert event.actor_name == "Usuario de prueba"
+    assert event.actor_id == "demo_user"
+    assert event.actor_name == "Usuario de demostración"
     assert event.entity_label == "Beneficiario Prueba S.A.S."
 
 
@@ -116,7 +116,7 @@ def test_update_beneficiary_updates_name_and_normalized_name(client, db_session)
         "before": "Proveedor Original",
         "after": "Proveedor Pacífico S.A.S.",
     }
-    assert event.actor_id == "test_user_01"
+    assert event.actor_id == "demo_user"
 
 
 def test_update_missing_beneficiary_returns_not_found(client, db_session):
@@ -337,7 +337,7 @@ def test_policy_audit_diff_activation_and_budget(client, db_session):
     assert [event.action for event in first_events].count("POLICY_CREATED") == 1
     assert [event.action for event in first_events].count("POLICY_ACTIVATED") == 1
     created_event = next(event for event in first_events if event.action == "POLICY_CREATED")
-    assert created_event.actor_id == "test_user_01"
+    assert created_event.actor_id == "demo_user"
     assert created_event.event_metadata["change_reason"] == "Versión inicial de prueba"
 
     second = client.put(
@@ -381,7 +381,7 @@ def test_policy_audit_diff_activation_and_budget(client, db_session):
         action="POLICY_ACTIVATED", entity_id=second_id
     ).one()
     assert activation.event_metadata["deactivated_policy_version"] == 1
-    assert activation.actor_id == "test_user_01"
+    assert activation.actor_id == "demo_user"
 
     budget = client.patch("/api/v1/policy/budget", json={"period_budget": 5000})
     assert budget.status_code == 200, budget.text
@@ -418,7 +418,7 @@ def test_create_and_list_invoice(client, db_session):
     upload_event = db_session.query(AuditLog).filter_by(
         action="INVOICE_UPLOADED", entity_id="inv_test_01"
     ).one()
-    assert upload_event.actor_id == "test_user_01"
+    assert upload_event.actor_id == "demo_user"
     assert upload_event.event_metadata["amount"] == 800.0
 
     response = client.get("/api/v1/invoices/inv_test_01")
@@ -504,16 +504,15 @@ def test_invoice_review_audit_uses_authenticated_actor(client, db_session):
         json={
             "action": "approve",
             "reason": "Verificación completada",
-            "reviewer_demo_id": "usuario_falsificado",
         },
     )
     assert response.status_code == 200, response.text
     review = db_session.query(HumanReview).filter_by(invoice_id="inv_review_audit").one()
-    assert review.reviewer_demo_id == "test_user_01"
+    assert review.reviewer_demo_id == "demo_user"
     event = db_session.query(AuditLog).filter_by(
         action="INVOICE_APPROVED", entity_id="inv_review_audit"
     ).one()
-    assert event.actor_id == "test_user_01"
+    assert event.actor_id == "demo_user"
     assert event.event_metadata["reason"] == "Verificación completada"
     assert event.changes["status"] == {
         "before": "NEEDS_HUMAN_APPROVAL",

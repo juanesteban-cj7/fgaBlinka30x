@@ -6,7 +6,6 @@ import PolicyParams from '../components/rules/PolicyParams'
 import PolicyActionsMatrix from '../components/rules/PolicyActionsMatrix'
 import PolicyEditor from '../components/rules/PolicyEditor'
 import PolicyVersionsTable from '../components/rules/PolicyVersionsTable'
-import { useAuth } from '../components/AuthContext'
 
 function draftFromPolicy(source: PaymentPolicy, version: number, catalog: RuleCatalogItem[]): PolicyDraft {
   const configuredActions = new Map(source.rule_actions.map(({ code, action }) => [code, action]))
@@ -45,8 +44,7 @@ export default function Rules() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const { user } = useAuth()
-  const canEdit = user !== null
+  const canEdit = true
 
   const refresh = useCallback(async () => {
     const [activePolicy, ruleCatalog, policyVersions] = await Promise.all([

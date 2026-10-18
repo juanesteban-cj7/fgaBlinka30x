@@ -20,7 +20,6 @@ def seed(db):
     pol = cfg["policy"]
 
     from app.models.agreement import Agreement
-    from app.models.app_user import AppUser
     from app.models.beneficiary import Beneficiary
     from app.models.budget_reservation import BudgetReservation
     from app.models.company import CompanyDemo
@@ -28,27 +27,7 @@ def seed(db):
     from app.models.policy import PaymentPolicy
     from app.models.rule_action import RuleAction
 
-    demo_users = (
-        ("user_ana_perez", "ana.perez", "Ana Pérez"),
-        ("user_carlos_ruiz", "carlos.ruiz", "Carlos Ruiz"),
-        ("user_laura_gomez", "laura.gomez", "Laura Gómez"),
-    )
-    from app.services.auth import hash_password
-
-    for user_id, username, full_name in demo_users:
-        if not db.query(AppUser).filter(AppUser.username == username).first():
-            db.add(
-                AppUser(
-                    id=user_id,
-                    username=username,
-                    full_name=full_name,
-                    password_hash=hash_password("Demo2026!"),
-                    is_active=True,
-                )
-            )
-
     if db.query(CompanyDemo).filter(CompanyDemo.id == company["id"]).first():
-        db.commit()
         print("Seed ya aplicado: se conservan los datos existentes.")
         return
 

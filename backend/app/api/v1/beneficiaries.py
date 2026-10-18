@@ -1,10 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import DemoActor, get_demo_actor
 from app.database import get_db
 from app.models.agreement import Agreement
-from app.models.app_user import AppUser
 from app.models.beneficiary import Beneficiary
 from app.models.invoice import Invoice
 from app.rules.normalization import norm_name
@@ -31,7 +30,7 @@ def list_beneficiaries(company_id: str | None = None, db: Session = Depends(get_
 def create_beneficiary(
     payload: BeneficiaryCreate,
     db: Session = Depends(get_db),
-    user: AppUser = Depends(get_current_user),
+    user: DemoActor = Depends(get_demo_actor),
 ):
     existing = (
         db.query(Beneficiary)
@@ -72,7 +71,7 @@ def update_beneficiary(
     beneficiary_id: str,
     payload: BeneficiaryUpdate,
     db: Session = Depends(get_db),
-    user: AppUser = Depends(get_current_user),
+    user: DemoActor = Depends(get_demo_actor),
 ):
     beneficiary = db.query(Beneficiary).filter(Beneficiary.id == beneficiary_id).first()
     if not beneficiary:
@@ -124,7 +123,7 @@ def update_beneficiary(
 def delete_beneficiary(
     beneficiary_id: str,
     db: Session = Depends(get_db),
-    user: AppUser = Depends(get_current_user),
+    user: DemoActor = Depends(get_demo_actor),
 ):
     beneficiary = db.query(Beneficiary).filter(Beneficiary.id == beneficiary_id).first()
     if not beneficiary:

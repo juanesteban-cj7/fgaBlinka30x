@@ -4,9 +4,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import DemoActor, get_demo_actor
 from app.database import get_db
-from app.models.app_user import AppUser
 from app.models.audit_log import AuditLog
 from app.schemas.audit_log import AuditLogPage
 
@@ -14,6 +13,7 @@ router = APIRouter()
 
 
 @router.get("/", response_model=AuditLogPage, tags=["audit-log"])
+@router.get("", response_model=AuditLogPage, tags=["audit-log"], include_in_schema=False)
 def list_audit_log(
     action: list[str] | None = Query(default=None),
     entity_type: str | None = None,
@@ -25,7 +25,7 @@ def list_audit_log(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-    _user: AppUser = Depends(get_current_user),
+    _user: DemoActor = Depends(get_demo_actor),
 ):
     query = db.query(AuditLog)
     if action:

@@ -76,7 +76,7 @@ def test_evaluate_eligible_reserves_budget(client, db_session):
     event = db_session.query(AuditLog).filter_by(
         action="INVOICE_EVALUATED", entity_id="inv_eval_01"
     ).one()
-    assert event.actor_id == "test_user_01"
+    assert event.actor_id == "demo_user"
     assert event.event_metadata == {
         "outcome": "ELIGIBLE_SIMULATED",
         "policy_version": 1,

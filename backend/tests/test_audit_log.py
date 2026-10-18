@@ -128,4 +128,10 @@ def test_audit_log_filters_and_paginates(client, db_session, test_user):
 def test_audit_log_has_no_mutation_routes(client, unauthenticated_client):
     assert client.patch("/api/v1/audit-log").status_code == 405
     assert client.delete("/api/v1/audit-log").status_code == 405
-    assert unauthenticated_client.get("/api/v1/audit-log").status_code == 401
+    assert unauthenticated_client.get("/api/v1/audit-log").status_code == 200
+
+
+def test_audit_log_accepts_both_trailing_slash_forms(client):
+    for path in ("/api/v1/audit-log", "/api/v1/audit-log/"):
+        response = client.get(path, follow_redirects=False)
+        assert response.status_code == 200, (path, response.text)

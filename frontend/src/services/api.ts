@@ -1,4 +1,4 @@
-import { AppUser, Invoice, InvoiceCreate, InvoiceUpdate, Beneficiary, BeneficiaryCreate, BeneficiaryUpdate, LoginResponse, PaymentPolicy, DecisionRecord, DashboardSummary, InvoiceOutcome, BudgetUpdate, RuleCatalogItem, PolicyMutation, ApiValidationIssue, AuditAction, AuditLogPage } from '../types/index'
+import { Invoice, InvoiceCreate, InvoiceUpdate, Beneficiary, BeneficiaryCreate, BeneficiaryUpdate, PaymentPolicy, DecisionRecord, DashboardSummary, InvoiceOutcome, BudgetUpdate, RuleCatalogItem, PolicyMutation, ApiValidationIssue, AuditAction, AuditLogPage } from '../types/index'
 
 const API_BASE = '/api/v1'
 export const DEMO_COMPANY_ID = 'co_demo_001'
@@ -35,8 +35,6 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     if (!(options.body instanceof FormData) && !headers.has('Content-Type')) {
       headers.set('Content-Type', 'application/json')
     }
-    const token = localStorage.getItem('access_token')
-    if (token) headers.set('Authorization', `Bearer ${token}`)
     res = await fetch(`${API_BASE}${path}`, {
       ...options,
       headers,
@@ -51,7 +49,6 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw error
   }
   if (!res.ok) {
-    if (res.status === 401 && path !== '/auth/login') redirectToLogin()
     let detail = res.statusText
     try {
       const body = await res.json()
@@ -65,11 +62,6 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json()
 }
 
-function redirectToLogin() {
-  localStorage.removeItem('access_token')
-  if (window.location.pathname !== '/login') window.location.assign('/login')
-}
-
 function createInvoiceId(): string {
   const timestamp = Date.now().toString(36)
   const randomPart = Math.random().toString(36).slice(2, 14).padEnd(12, '0')
@@ -79,9 +71,7 @@ function createInvoiceId(): string {
 async function postInvoiceFile(form: FormData): Promise<Invoice> {
   let res: Response
   try {
-    const token = localStorage.getItem('access_token')
-    const headers = token ? { Authorization: `Bearer ${token}` } : undefined
-    res = await fetch(`${API_BASE}/invoices/upload`, { method: 'POST', body: form, headers })
+    res = await fetch(`${API_BASE}/invoices/upload`, { method: 'POST', body: form })
   } catch (error) {
     if (error instanceof TypeError) {
       throw new ApiError(
@@ -92,7 +82,6 @@ async function postInvoiceFile(form: FormData): Promise<Invoice> {
     throw error
   }
   if (!res.ok) {
-    if (res.status === 401) redirectToLogin()
     let detail = res.statusText
     try {
       const body = await res.json()
@@ -104,17 +93,6 @@ async function postInvoiceFile(form: FormData): Promise<Invoice> {
 }
 
 export const api = {
-  login: async (username: string, password: string) => {
-    const result = await request<LoginResponse>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ username, password }),
-    })
-    localStorage.setItem('access_token', result.access_token)
-    return result
-  },
-  getCurrentUser: () => request<AppUser>('/auth/me'),
-  logout: () => localStorage.removeItem('access_token'),
-
   health: () => request<{ status: string }>('/health'),
 
   getPolicy: () => request<PaymentPolicy>('/policy/'),

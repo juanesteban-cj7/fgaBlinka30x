@@ -12,20 +12,6 @@ export type InvoiceOutcome =
 export type InvoiceSource = 'pdf' | 'image' | 'manual' | 'email_text' | 'history'
 export type InvoiceFieldSource = 'pdf' | 'image' | 'ocr' | 'manual'
 
-export interface AppUser {
-  id: string
-  username: string
-  full_name: string
-  is_active: boolean
-}
-
-export interface LoginResponse {
-  access_token: string
-  token_type: 'bearer'
-  expires_in: number
-  user: AppUser
-}
-
 export interface InvoiceExtractedFields {
   beneficiary_name?: string | null
   invoice_number?: string | null

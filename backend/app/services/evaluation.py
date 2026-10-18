@@ -2,6 +2,7 @@ import uuid
 from decimal import Decimal
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
+from typing import TYPE_CHECKING
 
 from app.database import SessionLocal
 from app.models.invoice import Invoice
@@ -11,9 +12,11 @@ from app.models.policy import PaymentPolicy
 from app.models.rule_action import RuleAction
 from app.models.beneficiary import Beneficiary
 from app.models.agreement import Agreement
-from app.models.app_user import AppUser
 from app.rules.engine import evaluate
 from app.services.audit import INVOICE_EVALUATED, record_audit
+
+if TYPE_CHECKING:
+    from app.api.deps import DemoActor
 
 
 def _reservations_by_period(db: Session, company_id: str):
@@ -26,7 +29,7 @@ def _reservations_by_period(db: Session, company_id: str):
     return {period: Decimal(str(total or 0)) for period, total in rows}
 
 
-def evaluate_and_record(db: Session, invoice_id: str, actor: AppUser | None = None):
+def evaluate_and_record(db: Session, invoice_id: str, actor: "DemoActor | None" = None):
     invoice = (
         db.query(Invoice)
         .options(joinedload(Invoice.company))

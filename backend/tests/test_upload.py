@@ -106,7 +106,7 @@ def test_upload_pdf_creates_pending_invoice(client, db_session, patch_extract):
     event = db_session.query(AuditLog).filter_by(
         action="INVOICE_UPLOADED", entity_id=body["id"]
     ).one()
-    assert event.actor_id == "test_user_01"
+    assert event.actor_id == "demo_user"
     assert event.event_metadata["file_name"] == "factura.pdf"
     assert event.event_metadata["file_hash"] == body["file_hash"]
     assert "raw_text" not in event.event_metadata

@@ -8,7 +8,6 @@ from app.models import decision_record
 from app.models import human_review
 from app.models import budget_reservation
 from app.models import policy_change_reason
-from app.models import app_user
 from app.models import audit_log
 
 __all__ = [
@@ -22,6 +21,5 @@ __all__ = [
     "human_review",
     "budget_reservation",
     "policy_change_reason",
-    "app_user",
     "audit_log",
 ]

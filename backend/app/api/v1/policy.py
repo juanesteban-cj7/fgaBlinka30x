@@ -3,9 +3,8 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import DemoActor, get_demo_actor
 from app.database import get_db
-from app.models.app_user import AppUser
 from app.models.policy import PaymentPolicy
 from app.models.rule_action import RuleAction
 from app.models.company import CompanyDemo
@@ -44,7 +43,7 @@ def get_active_policy(db: Session = Depends(get_db)):
 def create_policy(
     payload: PolicyCreate,
     db: Session = Depends(get_db),
-    user: AppUser = Depends(get_current_user),
+    user: DemoActor = Depends(get_demo_actor),
 ):
     company = db.query(CompanyDemo).filter(CompanyDemo.id == payload.company_id).first()
     if not company:
@@ -148,7 +147,7 @@ def create_policy(
 def activate_policy(
     payload: PolicyActivate,
     db: Session = Depends(get_db),
-    user: AppUser = Depends(get_current_user),
+    user: DemoActor = Depends(get_demo_actor),
 ):
     policy = db.query(PaymentPolicy).filter(PaymentPolicy.id == payload.policy_id).first()
     if not policy:
@@ -194,7 +193,7 @@ def activate_policy(
 def update_active_budget(
     payload: BudgetUpdate,
     db: Session = Depends(get_db),
-    user: AppUser = Depends(get_current_user),
+    user: DemoActor = Depends(get_demo_actor),
 ):
     if payload.period_budget < 0:
         raise HTTPException(status_code=422, detail="El presupuesto no puede ser negativo")

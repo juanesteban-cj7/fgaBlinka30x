@@ -27,7 +27,6 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en el archivo .env}
       DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/facturas_demo
     ports:
       - "8000:8000"

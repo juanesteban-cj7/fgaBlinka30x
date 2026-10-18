@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.models.audit_log import AuditLog
 
 if TYPE_CHECKING:
-    from app.models.app_user import AppUser
+    from app.api.deps import DemoActor
 
 POLICY_CREATED = "POLICY_CREATED"
 POLICY_ACTIVATED = "POLICY_ACTIVATED"
@@ -23,7 +23,7 @@ INVOICE_EVALUATED = "INVOICE_EVALUATED"
 def record_audit(
     db: Session,
     *,
-    actor: "AppUser | None",
+    actor: "DemoActor | None",
     action: str,
     entity_type: str,
     entity_id: str,

@@ -12,9 +12,8 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import DemoActor, get_demo_actor
 from app.database import get_db
-from app.models.app_user import AppUser
 from app.models.beneficiary import Beneficiary
 from app.models.company import CompanyDemo
 from app.models.invoice import Invoice
@@ -104,7 +103,7 @@ async def upload_invoice(
     due_date: date | None = Form(None),
     description: str | None = Form(None),
     db: Session = Depends(get_db),
-    user: AppUser = Depends(get_current_user),
+    user: DemoActor = Depends(get_demo_actor),
 ):
     resolved_company_id: str
     beneficiary = None
@@ -227,7 +226,7 @@ async def upload_invoice(
 def reextract_invoice(
     invoice_id: str,
     db: Session = Depends(get_db),
-    _user: AppUser = Depends(get_current_user),
+    _user: DemoActor = Depends(get_demo_actor),
 ):
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not invoice:

@@ -6,9 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.deps import get_current_user
+from app.api.deps import DemoActor, get_demo_actor
 from app.database import get_db
-from app.models.app_user import AppUser
 from app.models.invoice import Invoice
 from app.models.human_review import HumanReview
 from app.models.beneficiary import Beneficiary
@@ -46,7 +45,7 @@ def list_invoices(
 def create_invoice(
     payload: InvoiceCreate,
     db: Session = Depends(get_db),
-    user: AppUser = Depends(get_current_user),
+    user: DemoActor = Depends(get_demo_actor),
 ):
     existing = db.query(Invoice).filter(Invoice.id == payload.id).first()
     if existing:
@@ -90,7 +89,7 @@ def update_invoice(
     invoice_id: str,
     payload: InvoiceUpdate,
     db: Session = Depends(get_db),
-    _user: AppUser = Depends(get_current_user),
+    _user: DemoActor = Depends(get_demo_actor),
 ):
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not invoice:
@@ -178,7 +177,7 @@ def review_invoice(
     invoice_id: str,
     payload: HumanReviewRequest,
     db: Session = Depends(get_db),
-    user: AppUser = Depends(get_current_user),
+    user: DemoActor = Depends(get_demo_actor),
 ):
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not invoice:

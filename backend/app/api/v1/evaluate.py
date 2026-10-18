@@ -1,9 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
-from app.api.deps import get_current_user
+from app.api.deps import DemoActor, get_demo_actor
 from app.database import get_db
-from app.models.app_user import AppUser
 from app.models.invoice import Invoice
 from app.models.decision_record import DecisionRecord
 from app.schemas.evaluation import EvaluationResult
@@ -16,7 +15,7 @@ router = APIRouter()
 def evaluate_invoice(
     invoice_id: str,
     db: Session = Depends(get_db),
-    user: AppUser = Depends(get_current_user),
+    user: DemoActor = Depends(get_demo_actor),
 ):
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not invoice:
