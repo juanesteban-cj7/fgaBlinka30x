@@ -3,8 +3,10 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.database import get_db
+from app.models.agreement import Agreement
 from app.models.app_user import AppUser
 from app.models.beneficiary import Beneficiary
+from app.models.invoice import Invoice
 from app.rules.normalization import norm_name
 from app.schemas.beneficiary import BeneficiaryOut, BeneficiaryCreate, BeneficiaryUpdate
 
@@ -32,9 +34,11 @@ def create_beneficiary(
     )
     if existing:
         raise HTTPException(status_code=400, detail="El beneficiario ya existe")
-    beneficiary = Beneficiary(**payload.model_dump())
-    if not beneficiary.normalized_name:
-        beneficiary.normalized_name = norm_name(beneficiary.name)
+    beneficiary_data = payload.model_dump()
+    beneficiary_data["normalized_name"] = norm_name(
+        beneficiary_data["name"]
+    )
+    beneficiary = Beneficiary(**beneficiary_data)
     db.add(beneficiary)
     db.commit()
     db.refresh(beneficiary)
@@ -57,6 +61,7 @@ def update_beneficiary(
         name = update_values["name"].strip()
         if not name:
             raise HTTPException(status_code=422, detail="El nombre no puede estar vacío")
+        update_values["name"] = name
         beneficiary.name = name
         beneficiary.normalized_name = norm_name(name)
     for field in ("allowed", "reference_code", "category"):
@@ -66,3 +71,29 @@ def update_beneficiary(
     db.commit()
     db.refresh(beneficiary)
     return beneficiary
+
+
+@router.delete("/{beneficiary_id}", status_code=204, tags=["beneficiaries"])
+def delete_beneficiary(
+    beneficiary_id: str,
+    db: Session = Depends(get_db),
+    _user: AppUser = Depends(get_current_user),
+):
+    beneficiary = db.query(Beneficiary).filter(Beneficiary.id == beneficiary_id).first()
+    if not beneficiary:
+        raise HTTPException(status_code=404, detail="Beneficiario no encontrado")
+
+    has_invoices = db.query(Invoice.id).filter(
+        Invoice.beneficiary_id == beneficiary.id
+    ).first()
+    has_agreements = db.query(Agreement.id).filter(
+        Agreement.beneficiary_id == beneficiary.id
+    ).first()
+    if has_invoices or has_agreements:
+        raise HTTPException(
+            status_code=409,
+            detail="No se puede eliminar el beneficiario porque tiene facturas o acuerdos asociados.",
+        )
+
+    db.delete(beneficiary)
+    db.commit()

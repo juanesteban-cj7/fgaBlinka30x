@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, DEMO_COMPANY_ID } from '../services/api'
 import type { Beneficiary } from '../types'
-import { Loader2, Pencil, UserRoundPlus, X } from 'lucide-react'
+import { Loader2, Pencil, Trash2, UserRoundPlus, X } from 'lucide-react'
 
 type BeneficiaryDialogMode = 'create' | 'edit' | null
 
@@ -109,6 +109,20 @@ export default function Beneficiaries() {
     }
   }
 
+  const removeBeneficiary = async (beneficiary: Beneficiary) => {
+    if (!window.confirm(`¿Eliminar a ${beneficiary.name}? Esta acción no se puede deshacer.`)) return
+    setError(null)
+    setSuccess(null)
+    try {
+      await api.deleteBeneficiary(beneficiary.id)
+      setBeneficiaries((current) => current.filter((item) => item.id !== beneficiary.id))
+      setSelectedId((current) => current === beneficiary.id ? null : current)
+      setSuccess(`Se eliminó el beneficiario ${beneficiary.name}.`)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'No se pudo eliminar el beneficiario.')
+    }
+  }
+
   if (loading) return <div className="center-panel"><Loader2 size={32} /></div>
 
   return (
@@ -191,6 +205,13 @@ export default function Beneficiaries() {
                           }}
                         >
                           <Pencil size={14} aria-hidden="true" /> Editar
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={() => removeBeneficiary(beneficiary)}
+                        >
+                          <Trash2 size={14} aria-hidden="true" /> Eliminar
                         </button>
                       </div>
                     </td>

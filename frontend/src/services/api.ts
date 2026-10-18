@@ -145,6 +145,9 @@ export const api = {
     method: 'PATCH',
     body: JSON.stringify(body),
   }),
+  deleteBeneficiary: (id: string) => request<void>(`/beneficiaries/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  }),
 
   listInvoices: (params?: { company_id?: string; status?: string; beneficiary_id?: string }) => {
     const qs = new URLSearchParams()

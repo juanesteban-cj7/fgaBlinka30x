@@ -25,6 +25,20 @@ def test_create_and_list_beneficiary(client):
     assert len(response.json()) == 1
 
 
+def test_create_beneficiary_normalizes_name_on_server(client):
+    response = client.post(
+        "/api/v1/beneficiaries",
+        json={
+            "id": "ben_normalized_01",
+            "company_id": "co_demo_001",
+            "name": "  Proveedor Pacífico S.A.S. ",
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["normalized_name"] == "proveedor pacifico sas"
+
+
 def test_create_duplicate_beneficiary_fails(client):
     payload = {
         "id": "ben_test_02",
@@ -65,6 +79,71 @@ def test_update_missing_beneficiary_returns_not_found(client, db_session):
     )
 
     assert response.status_code == 404
+
+
+def test_delete_unreferenced_beneficiary(client, db_session):
+    from app.models.beneficiary import Beneficiary
+    from app.models.company import CompanyDemo
+
+    db_session.add(CompanyDemo(id="co_delete", name="Empresa", currency_base="USD"))
+    db_session.add(Beneficiary(
+        id="ben_delete", company_id="co_delete", name="Proveedor",
+        normalized_name="proveedor", allowed=True,
+    ))
+    db_session.commit()
+
+    response = client.delete("/api/v1/beneficiaries/ben_delete")
+
+    assert response.status_code == 204
+    assert db_session.query(Beneficiary).filter_by(id="ben_delete").first() is None
+
+
+def test_delete_beneficiary_with_invoice_returns_conflict(client, db_session):
+    from app.models.beneficiary import Beneficiary
+    from app.models.company import CompanyDemo
+    from app.models.invoice import Invoice
+
+    db_session.add(CompanyDemo(id="co_delete_invoice", name="Empresa", currency_base="USD"))
+    db_session.add(Beneficiary(
+        id="ben_delete_invoice", company_id="co_delete_invoice", name="Proveedor",
+        normalized_name="proveedor", allowed=True,
+    ))
+    db_session.add(Invoice(
+        id="inv_delete_ref", company_id="co_delete_invoice",
+        beneficiary_id="ben_delete_invoice", source_type="manual", status="PENDING",
+    ))
+    db_session.commit()
+
+    response = client.delete("/api/v1/beneficiaries/ben_delete_invoice")
+
+    assert response.status_code == 409
+    assert "facturas o acuerdos asociados" in response.json()["detail"]
+
+
+def test_delete_beneficiary_with_agreement_returns_conflict(client, db_session):
+    from datetime import date
+
+    from app.models.agreement import Agreement
+    from app.models.beneficiary import Beneficiary
+    from app.models.company import CompanyDemo
+
+    db_session.add(CompanyDemo(id="co_delete_agreement", name="Empresa", currency_base="USD"))
+    db_session.add(Beneficiary(
+        id="ben_delete_agreement", company_id="co_delete_agreement", name="Proveedor",
+        normalized_name="proveedor", allowed=True,
+    ))
+    db_session.add(Agreement(
+        id="agr_delete_ref", company_id="co_delete_agreement",
+        beneficiary_id="ben_delete_agreement", description="Servicio",
+        expected_amount=100, currency="USD", valid_from=date(2026, 1, 1),
+        valid_to=date(2026, 12, 31),
+    ))
+    db_session.commit()
+
+    response = client.delete("/api/v1/beneficiaries/ben_delete_agreement")
+
+    assert response.status_code == 409
+    assert "facturas o acuerdos asociados" in response.json()["detail"]
 
 
 def test_create_policy(client, db_session):

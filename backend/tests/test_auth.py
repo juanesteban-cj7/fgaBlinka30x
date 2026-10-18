@@ -29,6 +29,7 @@ def test_auth_required_for_data_modifications(unauthenticated_client):
             "normalized_name": "beneficiario",
         }),
         ("patch", "/api/v1/beneficiaries/no-existe", {}),
+        ("delete", "/api/v1/beneficiaries/no-existe", None),
         ("post", "/api/v1/invoices", {
             "id": "inv_auth_test",
             "company_id": "co_demo_001",
@@ -45,7 +46,7 @@ def test_auth_required_for_data_modifications(unauthenticated_client):
     ]
 
     for method, url, body in requests:
-        response = getattr(unauthenticated_client, method)(url, json=body)
+        response = unauthenticated_client.request(method.upper(), url, json=body)
         assert response.status_code == 401, (method, url, response.text)
 
 
