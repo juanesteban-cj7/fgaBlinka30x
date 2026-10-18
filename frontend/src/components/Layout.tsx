@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { LayoutDashboard, FileText, Upload, ShieldCheck, Users, History, RotateCcw, Moon, Sun } from 'lucide-react'
 
+const darkLogo = new URL('../assets/trustflow-dark.png', import.meta.url).href
+const lightLogo = new URL('../assets/trustflow-light.png', import.meta.url).href
+
 const links = [
   { path: '/', label: 'Panel', icon: LayoutDashboard },
   { path: '/invoices', label: 'Facturas', icon: FileText },
@@ -26,7 +29,7 @@ export default function Layout() {
   return (
     <div className="layout">
       <aside className="sidebar">
-        <div className="logo">TrustFlow</div>
+        <img className="logo" src={darkMode ? darkLogo : lightLogo} alt="TrustFlow" />
         <nav className="nav">
           {links.map((l) => {
             const Icon = l.icon

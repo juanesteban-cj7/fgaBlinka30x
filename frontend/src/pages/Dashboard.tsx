@@ -1,18 +1,50 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { api } from '../services/api'
 import { formatCurrency } from '../lib/utils'
-import { Upload, Loader2, CheckCircle, Clock, ShieldCheck, History, FileText, Pencil, X } from 'lucide-react'
+import { Upload, Loader2, CheckCircle, Clock, CalendarClock, CalendarDays, Pencil, X } from 'lucide-react'
+import type { Beneficiary, Invoice } from '../types'
+
+type DateMode = 'due' | 'created'
+type DateRange = '7' | '15' | '30' | 'all'
+
+function parseInvoiceDate(value: string | null): Date | null {
+  if (!value) return null
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function parseCreatedDate(value: string | null): Date | null {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  date.setHours(0, 0, 0, 0)
+  return date
+}
+
+function formatImportantDate(date: Date): string {
+  return new Intl.DateTimeFormat('es-CO', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(date)
+}
 
 export default function Dashboard() {
   const [summary, setSummary] = useState<any>(null)
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [datesLoading, setDatesLoading] = useState(true)
+  const [datesError, setDatesError] = useState<string | null>(null)
+  const [dateMode, setDateMode] = useState<DateMode>('due')
+  const [dateRange, setDateRange] = useState<DateRange>('30')
   const [editingBudget, setEditingBudget] = useState(false)
   const [budgetValue, setBudgetValue] = useState('')
   const [savingBudget, setSavingBudget] = useState(false)
   const [budgetError, setBudgetError] = useState<string | null>(null)
-  const navigate = useNavigate()
 
   useEffect(() => {
     api.dashboardSummary()
@@ -20,6 +52,39 @@ export default function Dashboard() {
       .catch(() => setError('No se pudo cargar el resumen'))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    Promise.all([api.listInvoices(), api.listBeneficiaries()])
+      .then(([loadedInvoices, loadedBeneficiaries]) => {
+        setInvoices(loadedInvoices)
+        setBeneficiaries(loadedBeneficiaries)
+      })
+      .catch(() => setDatesError('No se pudieron cargar las fechas de las facturas'))
+      .finally(() => setDatesLoading(false))
+  }, [])
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const rangeDays = dateRange === 'all' ? null : Number(dateRange)
+  const rangeLimit = new Date(today)
+  if (rangeDays !== null) {
+    rangeLimit.setDate(rangeLimit.getDate() + (dateMode === 'due' ? rangeDays : -rangeDays))
+  }
+  const importantDates = invoices
+    .map((invoice) => ({
+      invoice,
+      date: dateMode === 'due' ? parseInvoiceDate(invoice.due_date) : parseCreatedDate(invoice.created_at),
+    }))
+    .filter((item): item is { invoice: Invoice; date: Date } => {
+      if (!item.date) return false
+      if (dateMode === 'due') return item.date >= today && (rangeDays === null || item.date <= rangeLimit)
+      return item.date <= today && (rangeDays === null || item.date >= rangeLimit)
+    })
+    .sort((a, b) => dateMode === 'due'
+      ? a.date.getTime() - b.date.getTime()
+      : b.date.getTime() - a.date.getTime())
+  const beneficiaryNames = new Map(beneficiaries.map((beneficiary) => [beneficiary.id, beneficiary.name]))
+  const rangeLabel = dateRange === 'all' ? 'desde siempre' : `${dateRange} días`
 
   const startBudgetEdit = () => {
     setBudgetValue(String(summary?.budget_total ?? 0))
@@ -68,7 +133,7 @@ export default function Dashboard() {
           <div className="metric-value" style={{ color: 'var(--color-success)' }}>{summary?.ELIGIBLE_SIMULATED ?? 0}</div>
         </div>
         <div>
-          <div className="metric-label">Frenadas</div>
+          <div className="metric-label">Canceladas</div>
           <div className="metric-value" style={{ color: 'var(--color-danger)' }}>{summary?.BLOCKED ?? 0}</div>
         </div>
         <div>
@@ -108,20 +173,64 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="card" style={{ marginTop: '1.5rem' }}>
-        <h2 style={{ fontSize: '1rem', marginBottom: '1rem', color: 'var(--color-text-muted)' }}>Acciones rápidas</h2>
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button className="btn btn-outline" onClick={() => navigate('/invoices')}>
-            <FileText size={18} /> Ver facturas
-          </button>
-          <button className="btn btn-outline" onClick={() => navigate('/approvals')}>
-            <ShieldCheck size={18} /> Centro de aprobaciones
-          </button>
-          <button className="btn btn-outline" onClick={() => navigate('/history')}>
-            <History size={18} /> Historial de decisiones
-          </button>
+      <section className="card" style={{ marginTop: '1.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+          <div>
+            <h2 style={{ fontSize: '1rem' }}>Fechas importantes</h2>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', marginTop: '0.2rem' }}>
+              {dateMode === 'due' ? 'Vencimientos' : 'Facturas creadas'} · {rangeLabel}
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <label className="important-date-filter">
+              <span>Rango</span>
+              <select className="form-control" value={dateRange} onChange={(event) => setDateRange(event.target.value as DateRange)} aria-label="Rango de fechas importantes">
+                <option value="7">7 días</option>
+                <option value="15">15 días</option>
+                <option value="30">30 días</option>
+                <option value="all">Desde Siempre</option>
+              </select>
+            </label>
+            <label className="important-date-filter">
+              <span>Fecha</span>
+              <select className="form-control" value={dateMode} onChange={(event) => setDateMode(event.target.value as DateMode)} aria-label="Tipo de fecha importante">
+                <option value="due">Por Vencimiento</option>
+                <option value="created">Por Creación</option>
+              </select>
+            </label>
+          </div>
         </div>
-      </div>
+
+        {datesLoading ? (
+          <div className="center-panel"><Loader2 size={24} /></div>
+        ) : datesError ? (
+          <div className="alert alert-error">{datesError}</div>
+        ) : (
+          <div>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.95rem', marginBottom: '0.5rem' }}>
+              {dateMode === 'due' ? <CalendarClock size={18} /> : <CalendarDays size={18} />}
+              {dateMode === 'due' ? 'Próximos vencimientos' : 'Creaciones recientes'}
+            </h3>
+            {importantDates.map(({ invoice, date }, index) => (
+              <Link key={invoice.id} to={`/invoices/${invoice.id}`} className={`important-date-item${index === 0 ? ' nearest' : ''}`}>
+                <span className="important-date-info">
+                  <strong>{invoice.invoice_number || `Factura ${invoice.id}`}</strong>
+                  <span className="important-date-meta">
+                    <small>{beneficiaryNames.get(invoice.beneficiary_id ?? '') || 'Beneficiario no asignado'}</small>
+                    <small>{formatCurrency(invoice.amount, invoice.currency || 'USD')}</small>
+                  </span>
+                </span>
+                <span className="important-date-value">{formatImportantDate(date)}</span>
+              </Link>
+            ))}
+            {importantDates.length === 0 && (
+              <div className="empty-state" style={{ gridColumn: '1 / -1' }}>
+                No hay facturas para este tipo de fecha y rango.
+              </div>
+            )}
+          </div>
+        )}
+      </section>
     </div>
   )
 }

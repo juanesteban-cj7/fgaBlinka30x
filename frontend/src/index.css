@@ -36,30 +36,30 @@
 }
 
 [data-theme='dark'] {
-  --color-bg: #0f172a;
-  --color-surface: #1e293b;
-  --color-border: #334155;
+  --color-bg: #0b1220;
+  --color-surface: #1a2535;
+  --color-border: #2c394d;
   --color-text: #f1f5f9;
   --color-text-muted: #94a3b8;
   --color-primary: #60a5fa;
   --color-primary-hover: #3b82f6;
   --color-success: #4ade80;
-  --color-success-bg: #14532d;
+  --color-success-bg: #104525;
   --color-warning: #fbbf24;
-  --color-warning-bg: #78350f;
+  --color-warning-bg: #6b2f0d;
   --color-danger: #f87171;
-  --color-danger-bg: #7f1d1d;
+  --color-danger-bg: #701a1a;
   --color-info: #22d3ee;
-  --color-info-bg: #164e63;
-  --color-surface-hover: #334155;
-  --color-primary-soft: #1e3a5f;
-  --color-chip-danger-bg: #7f1d1d;
+  --color-info-bg: #124354;
+  --color-surface-hover: #2b394d;
+  --color-primary-soft: #1b3657;
+  --color-chip-danger-bg: #701a1a;
   --color-chip-danger: #fecaca;
-  --color-chip-warning-bg: #78350f;
+  --color-chip-warning-bg: #6b2f0d;
   --color-chip-warning: #fde68a;
-  --color-chip-info-bg: #1e3a5f;
+  --color-chip-info-bg: #1b3657;
   --color-chip-info: #bfdbfe;
-  --color-chip-success-bg: #14532d;
+  --color-chip-success-bg: #104525;
   --color-chip-success: #bbf7d0;
   --color-pending-text: #cbd5e1;
   --color-danger-border: #991b1b;
@@ -224,7 +224,26 @@ tr:hover { background: var(--color-surface-hover); }
   flex-direction: column;
   padding: 1.5rem 1rem;
 }
-.logo { font-weight: 700; font-size: 1.25rem; margin-bottom: 2rem; color: var(--color-primary); letter-spacing: -0.02em; }
+.logo { display: block; width: 100%; max-width: 180px; height: auto; margin-bottom: 2rem; }
+.important-date-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+.important-date-item:hover { background: var(--color-surface-hover); }
+.important-date-item.nearest { border-color: var(--color-primary); background: var(--color-primary-soft); }
+.important-date-info { min-width: 0; }
+.important-date-item strong, .important-date-item small { display: block; }
+.important-date-item small { margin-top: 0.15rem; color: var(--color-text-muted); }
+.important-date-meta { display: flex; gap: 0.75rem; flex-wrap: wrap; font-size: 0.78rem; }
+.important-date-filter { display: grid; gap: 0.25rem; color: var(--color-text-muted); font-size: 0.78rem; }
+.important-date-filter .form-control { min-width: 145px; padding: 0.45rem 0.6rem; }
+.important-date-value { color: var(--color-primary); font-weight: 700; white-space: nowrap; }
 .nav { display: flex; flex-direction: column; gap: 0.25rem; flex: 1; }
 .nav a {
   padding: 0.6rem 0.9rem;
