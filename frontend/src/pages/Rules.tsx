@@ -6,6 +6,7 @@ import PolicyParams from '../components/rules/PolicyParams'
 import PolicyActionsMatrix from '../components/rules/PolicyActionsMatrix'
 import PolicyEditor from '../components/rules/PolicyEditor'
 import PolicyVersionsTable from '../components/rules/PolicyVersionsTable'
+import { DEMO_COMPANY_ID } from '../services/api'
 
 function draftFromPolicy(source: PaymentPolicy, version: number, catalog: RuleCatalogItem[]): PolicyDraft {
   const configuredActions = new Map(source.rule_actions.map(({ code, action }) => [code, action]))
@@ -34,6 +35,27 @@ function errorMessage(error: unknown): string {
   return error instanceof ApiError ? error.detail : error instanceof Error ? error.message : 'Ocurrió un error inesperado.'
 }
 
+function initialPolicy(catalog: RuleCatalogItem[]): PaymentPolicy {
+  return {
+    id: '',
+    company_id: DEMO_COMPANY_ID,
+    version: 0,
+    active: false,
+    currency: 'USD',
+    max_invoice_amount: 5000,
+    approval_threshold: 1000,
+    period_budget: 12000,
+    period_type: 'monthly',
+    period_basis: 'issue_date',
+    amount_tolerance_pct: 0,
+    min_extraction_confidence: 0.8,
+    name_similarity_threshold: 0.85,
+    possible_duplicate_date_window_days: 0,
+    created_at: null,
+    rule_actions: catalog.map(({ code, default_action }) => ({ code, action: default_action })),
+  }
+}
+
 export default function Rules() {
   const [policy, setPolicy] = useState<PaymentPolicy | null>(null)
   const [catalog, setCatalog] = useState<RuleCatalogItem[]>([])
@@ -47,14 +69,21 @@ export default function Rules() {
   const canEdit = true
 
   const refresh = useCallback(async () => {
-    const [activePolicy, ruleCatalog, policyVersions] = await Promise.all([
-      api.getPolicy(),
+    const [ruleCatalog, policyVersions] = await Promise.all([
       api.getPolicyCatalog(),
       api.listPolicyVersions(),
     ])
-    setPolicy(activePolicy)
     setCatalog(ruleCatalog)
     setVersions(policyVersions.sort((left, right) => right.version - left.version))
+    try {
+      setPolicy(await api.getPolicy())
+    } catch (err: unknown) {
+      if (err instanceof ApiError && err.status === 404) {
+        setPolicy(null)
+        return
+      }
+      throw err
+    }
   }, [])
 
   useEffect(() => {
@@ -67,6 +96,14 @@ export default function Rules() {
     const nextVersion = Math.max(0, ...versions.map(({ version }) => version)) + 1
     setDraftSource(source)
     setDraft(draftFromPolicy(source, nextVersion, catalog))
+    setError(null)
+    setNotice(null)
+  }
+
+  const startInitialDraft = () => {
+    const source = initialPolicy(catalog)
+    setDraftSource(source)
+    setDraft(draftFromPolicy(source, 1, catalog))
     setError(null)
     setNotice(null)
   }
@@ -113,7 +150,54 @@ export default function Rules() {
   }
 
   if (loading) return <div className="center-panel"><Loader2 size={32} className="spin" aria-label="Cargando reglas y políticas" /></div>
-  if (!policy) return <div className="page"><div className="alert alert-error" role="alert" aria-live="assertive">{error ?? 'No se pudo cargar la política.'}</div></div>
+  if (!policy) {
+    return (
+      <div className="page rules-page">
+        <div className="alert alert-error" role="alert" aria-live="assertive">
+          {error ?? 'No hay política activa. Activa una versión existente o crea la política inicial para habilitar la evaluación de facturas.'}
+        </div>
+        {notice && <div className="alert alert-success" role="status" aria-live="polite">{notice}</div>}
+        {error && <button className="btn btn-outline" type="button" onClick={() => {
+          setError(null)
+          refresh().catch((err: unknown) => setError(errorMessage(err)))
+        }}>Reintentar</button>}
+        {!draft && versions.length === 0 && !error && (
+          <button className="btn btn-primary" type="button" onClick={startInitialDraft} disabled={catalog.length === 0}>
+            <Plus size={17} /> Crear política inicial
+          </button>
+        )}
+        {draft && draftSource && (
+          <PolicyEditor
+            key={`${draftSource.id || 'initial'}-${draft.version}`}
+            source={draftSource}
+            draft={draft}
+            catalog={catalog}
+            canEdit={canEdit}
+            saving={saving}
+            error={error}
+            onCancel={closeDraft}
+            onSave={saveDraft}
+          />
+        )}
+        {versions.length > 0 && (
+          <>
+            {!draft && (
+              <button className="btn btn-primary" type="button" onClick={() => startDraft(versions[0])}>
+                <Plus size={17} /> Crear versión desde una existente
+              </button>
+            )}
+            <PolicyVersionsTable
+              policies={versions}
+              canEdit={canEdit}
+              busy={saving}
+              onActivate={activateVersion}
+              onDuplicate={startDraft}
+            />
+          </>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="page rules-page">
